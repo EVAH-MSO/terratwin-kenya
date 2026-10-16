@@ -23,6 +23,3 @@ A 3D digital twin of Kenya — an interactive geospatial platform for visualizin
 
 See `backend/README.md` and `frontend/README.md` for local setup instructions.
 
-## Author
-
-EVAH MSO — Final Year Project
