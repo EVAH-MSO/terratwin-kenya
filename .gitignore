@@ -1,0 +1,34 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+pip-log.txt
+*.egg-info/
+
+# Node
+node_modules/
+.angular/
+dist/
+npm-debug.log*
+
+# Data — too big for git
+backend/data/*.pbf
+backend/data/*.gdb/
+backend/data/*.zip
+backend/cache/
+*.osm.pbf
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local

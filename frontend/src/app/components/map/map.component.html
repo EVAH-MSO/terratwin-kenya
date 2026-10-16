@@ -1,0 +1,177 @@
+<div class="map-wrapper" [class.dark]="theme === 'dark'" [class.presentation]="presentationMode">
+
+  <header class="topbar">
+    <div class="brand">🌍 TerraTwin Kenya</div>
+
+    <div class="search-wrapper">
+      <input id="search-input" type="text"
+             placeholder="Search county... (Ctrl+K)"
+             [(ngModel)]="searchTerm"
+             (input)="onSearchInput($any($event.target).value)"
+             (keyup.enter)="onSearchSubmit()"
+             (focus)="showSuggestions = filteredCounties.length > 0" />
+      <div class="suggestions" *ngIf="showSuggestions && filteredCounties.length > 0">
+        <div class="suggestion" *ngFor="let c of filteredCounties.slice(0, 8)"
+             (click)="selectFromSidebar(c)">
+          <span class="sug-name">{{ c.name }}</span>
+          <span class="sug-capital">{{ c.capital }} · {{ c.code }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <button class="icon-btn" (click)="goHome()" title="Home view">🏠</button>
+      <button class="icon-btn" (click)="shareLink()" title="Copy share link">🔗</button>
+      <button class="icon-btn" (click)="toggleTheme()" title="Toggle theme">{{ theme === 'light' ? '🌙' : '☀️' }}</button>
+      <button class="icon-btn" (click)="togglePresentationMode()" [class.active]="presentationMode" title="Presentation mode">🎬</button>
+    </div>
+  </header>
+
+  <aside class="sidebar" [class.closed]="!sidebarOpen">
+    <div class="sidebar-section">
+      <div class="section-title">Counties ({{ counties.length }})</div>
+      <div class="county-list">
+        <div class="county-item"
+             *ngFor="let c of counties"
+             [class.selected]="selectedCounty?.id === c.id"
+             (click)="selectFromSidebar(c)">
+          <div class="county-name">{{ c.name }}</div>
+          <div class="county-meta">{{ c.capital }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section selected-panel" *ngIf="selectedCounty">
+      <div class="section-title">Selected: {{ selectedCounty.name }}</div>
+
+      <div class="subsection-title">Data Layers</div>
+      <label class="layer-toggle">
+        <input type="checkbox" [checked]="showRoads" (change)="toggleRoads()" />
+        <span class="layer-label">🛣️ Roads</span>
+        <span class="layer-count" *ngIf="roadCount">{{ roadCount }}</span>
+      </label>
+      <label class="layer-toggle">
+        <input type="checkbox" [checked]="showFacilities" (change)="toggleFacilities()" />
+        <span class="layer-label">🏥 Facilities</span>
+        <span class="layer-count" *ngIf="facilityCount">{{ facilityCount }}</span>
+      </label>
+      <label class="layer-toggle">
+        <input type="checkbox" [checked]="showSublocations" (change)="toggleSublocations()" />
+        <span class="layer-label">🗺️ Sub-counties</span>
+        <span class="layer-count" *ngIf="sublocationCount">{{ sublocationCount }}</span>
+      </label>
+
+      <div class="subsection-title" style="margin-top: 12px;">Tools</div>
+      <div class="tool-grid">
+        <button class="mini-tool" (click)="toggleMeasure()" [class.active]="measureMode" title="Measure distance">📏</button>
+        <button class="mini-tool" (click)="toggleNearestMode()" [class.active]="nearestMode" title="Find nearest hospital">🎯</button>
+        <button class="mini-tool" (click)="toggleCompareMode()" [class.active]="compareMode" title="Compare counties">📊</button>
+        <button class="mini-tool" (click)="togglePinMode()" [class.active]="pinMode" title="Drop pins">📌</button>
+        <button class="mini-tool" (click)="exportVisible()" title="Export visible">📤</button>
+        <button class="mini-tool" (click)="takeScreenshot()" title="Save screenshot">📸</button>
+      </div>
+
+      <button class="clear-btn" (click)="clearSelection()">Clear selection</button>
+    </div>
+  </aside>
+
+  <button class="sidebar-toggle" (click)="toggleSidebar()">{{ sidebarOpen ? '◀' : '▶' }}</button>
+
+  <div *ngIf="selectedCounty" class="info-card">
+    <div class="info-header">
+      <h3>{{ selectedCounty.name }}</h3>
+      <button class="close-btn" (click)="clearSelection()">&times;</button>
+    </div>
+    <div class="info-body">
+      <div class="info-row"><span class="label">Capital</span><span class="value">{{ selectedCounty.capital }}</span></div>
+      <div class="info-row"><span class="label">Code</span><span class="value">{{ selectedCounty.code }}</span></div>
+      <div class="info-row" *ngIf="selectedCounty.population"><span class="label">Population</span><span class="value">{{ formatNumber(selectedCounty.population) }}</span></div>
+      <div class="info-row" *ngIf="selectedCounty.area_km2"><span class="label">Area</span><span class="value">{{ formatNumber(selectedCounty.area_km2) }} km²</span></div>
+      <div class="info-row" *ngIf="countyStats"><span class="label">Sub-counties</span><span class="value">{{ countyStats.sublocations }}</span></div>
+      <div class="info-row" *ngIf="countyStats"><span class="label">Facilities</span><span class="value">{{ countyStats.facilities }}</span></div>
+    </div>
+  </div>
+
+  <div *ngIf="featureInfo" class="feature-card">
+    <div class="feature-header">
+      <h4>{{ featureInfo.title }}</h4>
+      <button class="close-btn" (click)="featureInfo = null">&times;</button>
+    </div>
+    <div class="feature-body">
+      <div class="info-row" *ngFor="let item of featureInfo.items">
+        <span class="label">{{ item.label }}</span>
+        <span class="value">{{ item.value }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="measureMode" class="measure-panel">
+    <div class="measure-title">📏 Measure Distance</div>
+    <div class="measure-info" *ngIf="measurePoints.length === 0">Click first point</div>
+    <div class="measure-info" *ngIf="measurePoints.length === 1">Click second point</div>
+    <div class="measure-result" *ngIf="measureResult">{{ measureResult }}</div>
+    <button class="clear-measure" (click)="clearMeasure()" *ngIf="measurePoints.length > 0">Clear</button>
+  </div>
+
+  <div *ngIf="compareMode && selectedCounty" class="compare-panel">
+    <div class="compare-title">📊 {{ selectedCounty.name }}</div>
+    <div *ngIf="!compareCounty" class="compare-info">Click a second county on the map</div>
+    <div *ngIf="compareCounty" class="compare-body">
+      <div class="compare-header">
+        <span>{{ selectedCounty.name }}</span><span>vs</span><span>{{ compareCounty.name }}</span>
+      </div>
+      <div class="compare-row">
+        <span>{{ formatNumber(selectedCounty.population) }}</span>
+        <span class="compare-label">Population</span>
+        <span>{{ formatNumber(compareCounty.population) }}</span>
+      </div>
+      <div class="compare-row">
+        <span>{{ formatNumber(selectedCounty.area_km2) }}</span>
+        <span class="compare-label">Area km²</span>
+        <span>{{ formatNumber(compareCounty.area_km2) }}</span>
+      </div>
+      <button class="clear-measure" (click)="clearComparison()">Reset second</button>
+    </div>
+  </div>
+
+  <div *ngIf="nearestMode && nearestResult" class="nearest-panel">
+    <div class="compare-title">🎯 Nearest Hospital</div>
+    <div *ngIf="nearestResult.error" class="compare-info">{{ nearestResult.error }}</div>
+    <div *ngIf="!nearestResult.error" class="nearest-body">
+      <div class="nearest-name">{{ nearestResult.name }}</div>
+      <div class="nearest-meta">{{ nearestResult.county }}</div>
+      <div class="nearest-distance">{{ nearestResult.distance_km }} km away</div>
+    </div>
+  </div>
+
+  <div *ngIf="pinMode && pins.length > 0" class="pins-panel">
+    <div class="compare-title">📌 Pins ({{ pins.length }})</div>
+    <div *ngFor="let p of pins; let i = index" class="pin-row">
+      <span class="pin-index">{{ i + 1 }}</span>
+      <span class="pin-coords">{{ p.lat.toFixed(3) }}, {{ p.lon.toFixed(3) }}</span>
+    </div>
+    <button class="clear-measure" (click)="clearPins()">Clear all</button>
+  </div>
+
+  <div class="coords">
+    <span>Lat {{ mouseLat.toFixed(4) }}</span>
+    <span>Lon {{ mouseLon.toFixed(4) }}</span>
+    <span>NBO {{ nairobiDistance.toFixed(0) }} km</span>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><span class="swatch county"></span> County</div>
+    <div class="legend-item" *ngIf="showRoads"><span class="swatch road"></span> Road</div>
+    <div class="legend-item" *ngIf="showFacilities"><span class="swatch fac"></span> Facility</div>
+    <div class="legend-item" *ngIf="showSublocations"><span class="swatch sub"></span> Sub-county</div>
+  </div>
+
+  <div *ngIf="loading" class="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text">{{ loadingMessage }}</div>
+    <div class="progress-bar"><div class="progress-fill" [style.width.%]="loadingPercent"></div></div>
+    <div class="progress-text">{{ loadingPercent }}%</div>
+  </div>
+
+  <div #cesiumContainer class="cesium-container"></div>
+</div>
